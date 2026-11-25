@@ -2299,8 +2299,17 @@ def _main(argv: list[str], project: Path | None = None) -> int:
     def read_image() -> None:
         """The image of --dockerfile. One wheelgap can't read is an error, unless -p and -t say what to check."""
         nonlocal image, unknown_image
+        dockerfile_path = Path(args.dockerfile)
         try:
-            image = read_dockerfile(Path(args.dockerfile), build_args)
+            dockerfile_path.stat()
+        except FileNotFoundError:
+            raise DockerfileError(f"{args.dockerfile}: no such file") from None
+        if dockerfile_path.is_dir():
+            raise DockerfileError(
+                f"{args.dockerfile}: is a folder; pass the Dockerfile in it, e.g. {dockerfile_path / 'Dockerfile'}"
+            )
+        try:
+            image = read_dockerfile(dockerfile_path, build_args)
         except HeredocSyntaxError as e:
             if args.dockerfile_inputs:
                 # -p and -t don't help --dockerfile-inputs here: say what does, with the line.
