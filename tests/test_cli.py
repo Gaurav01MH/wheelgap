@@ -1073,6 +1073,30 @@ def test_json_reports_input_errors_on_stdout(capsys, fixtures, tmp_path):
     assert error["type"] == "TargetError" and "glibc" in error["message"]
 
 
+@pytest.mark.parametrize("path_kind", ["missing", "directory"])
+@pytest.mark.parametrize("as_json", [False, True])
+def test_dockerfile_path_errors_are_clear(capsys, tmp_path, path_kind, as_json):
+    dockerfile = tmp_path / ("missing" if path_kind == "missing" else "docker")
+    if path_kind == "directory":
+        dockerfile.mkdir()
+        message = f"{dockerfile}: is a folder; pass the Dockerfile in it, e.g. {dockerfile / 'Dockerfile'}"
+    else:
+        message = f"{dockerfile}: no such file"
+
+    args = ["--dockerfile", str(dockerfile)]
+    if as_json:
+        args.append("--json")
+    code, out, err = run(capsys, *args)
+
+    assert code == 2
+    assert f"wheelgap: error: {message}" in err
+    if as_json:
+        error = json.loads(out)["error"]
+        assert error == {"message": message, "type": "DockerfileError"}
+    else:
+        assert not out
+
+
 def test_running_python_reports_freethreaded(monkeypatch):
     monkeypatch.setattr(sysconfig, "get_config_var", lambda name: 1 if name == "Py_GIL_DISABLED" else None)
     assert cli.running_python() == f"{sys.version_info.major}.{sys.version_info.minor}t"
